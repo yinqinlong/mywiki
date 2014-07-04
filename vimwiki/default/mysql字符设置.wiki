@@ -1,0 +1,17 @@
+====mysql字符设置====
+# 查看mysql字符集的命令`show variables like '%char%', show variables like '%collation%'`
+# 设置mysql字符集为utf8 
+{{{
+ 1.[client]
+	 default-character-set=utf8
+
+	 [mysql]
+	 default-character-set=utf8
+
+
+	 [mysqld]
+	 collation-server = utf8_unicode_ci
+	 init-connect='SET NAMES utf8'
+	 character-set-server = utf8
+  2.ALTER DATABASE databasename CHARACTER SET utf8 COLLATE utf8_general_ci;
+}}}

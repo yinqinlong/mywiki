@@ -1,0 +1,31 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<title>400</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head>
+<body>
+
+<h3 id="toc_0.0.1">nginx 400错误</h3>
+<ol>
+<li>
+HTTP头/Cookie过大o
+<pre 今天有人汇报nginx的HTTP400错误，而且这个HTTP400错误并不是每次都会出现的，查了一下发现nginx400错误是由于request header过大，通常是由于cookie中写入了较长的字符串所引起的。>
+ 解决方法是不要在cookie里记录过多数据，如果实在需要的话可以考虑调整在nginx.conf中的client_header_buffer_size(默认1k)
+ 若cookie太大，可能还需要调整large_client_header_buffers(默认4k)，该参数说明如下：
+ 请求行如果超过buffer，就会报HTTP 414错误(URI Too Long)
+ nginx接受最长的HTTP头部大小必须比其中一个buffer大，否则就会报400的HTTP错误(Bad Request)。
+  
+ 在nginx.conf中，将client_header_buffer_size和large_client_header_buffers都调大，可缓解此问题。
+ 其中主要配置是client_header_buffer_size这一项，默认是1k，所以header小于1k的话是不会出现问题的。
+ 按我现在配置是：
+ client_header_buffer_size 16k;
+ large_client_header_buffers 4 64k;
+ 这个配置可接收16k以下的header，在浏览器中cookie的字节数上限会非常大，所以实在是不好去使用那最大值。
+</pre>
+
+</ol>
+
+</body>
+</html>

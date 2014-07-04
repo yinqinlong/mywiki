@@ -1,0 +1,33 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="style.css">
+<title>普通登录</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head>
+<body>
+
+<h3 id="toc_0.0.1">普通登录</h3>
+<ol>
+<li>
+用户输入账号密码后，根据账号类型及账号获取用户记录；
+
+<li>
+验证密码
+
+<li>
+如果密码成功，设置session，标记session登录成功及session状态
+
+<li>
+更新登入时间，生成一个变化的hash秘钥，将秘钥记录到数据库
+
+<li>
+生成cookie,将用户id,秘钥,以及id+秘钥后生成的新秘钥存入cookie
+
+<li>
+下次登录时，验证cookie,根据id,秘钥以及新秘钥验证cookie,从数据库匹配记录
+
+</ol>
+
+</body>
+</html>

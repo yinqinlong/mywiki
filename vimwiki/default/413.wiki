@@ -1,0 +1,10 @@
+===413===
+# 413 Request Entity Too Large
+# 原因:上传文件太大，超过设置
+# 解决:
+{{{
+nginx.conf添加 client_max_body_size的设置，这个值默认是1m，可以增加到8m以增加提高文件大小限制；
+	php.ini这个大小client_max_body_size要和php.ini中的如下值的最大值一致或者稍大，这样就不会因为提交数据大小不一致出现的错误。
+	post_max_size = 8M
+	upload_max_filesize = 2M
+  }}}

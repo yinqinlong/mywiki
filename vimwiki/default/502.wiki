@@ -1,0 +1,28 @@
+===nginx 502 ===
+# bad gateway
+# 原因:是请求PHP-CGI已经执行，但是由于某种原因（一般是读取资源的问题）没有执行完毕而导致PHP-CGI进程终止。
+# 解决:
+{{{一般来说Nginx 502 Bad Gateway和php-fpm.conf的设置有关，
+  1.请检查你的FastCGI进程是否启动
+  2.FastCGI进程不够使用,请通过执行 netstat -anpo | grep "php-cgi" | wc -l 判断，是否接近你启动的FastCGI进程，接近你的设置，表示进程不够
+  3.fastcgi_connect_timeout 300;
+  fastcgi_send_timeout 300;
+  fastcgi_read_timeout 300;
+  这几项的值调高
+  4.nginx和apache一样，有前端缓冲限制
+  请把
+  fastcgi_buffer_size 32k;
+  fastcgi_buffers 8 32k;
+  这几项的值调高
+  5.如果你使用了Proxying，请把
+  proxy_buffer_size 16k;
+  proxy_buffers      4 16k;
+  这几项的值调高
+  6.将php-fpm.conf的<value name="request_terminate_timeout">0s</value>的0s改成一个时间
+  7.https转发配置错误
+  8.查看php-fpm.log
+  9.nginx.conf的rewrite-url规则等
+  10.php-fpm.pid权限的问题
+  11.当积累了大量的php请求，你重启php-fpm释放资源，但一两分钟不到，502又再次呈现，这是什么原因导致的呢？ 这时还应该考虑到数据库，查看下数据库进程是否有大量的locked进程，数据库死锁导致超时，前端终止了继续请求，但是SQL语句还在等待释放锁，这时就要重启数据库服务了或kill掉死锁SQL进程了
+  }}}
+

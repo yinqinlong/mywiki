@@ -1,0 +1,86 @@
+===nginx 504错误===
+# Gateway Time-out的含义是所请求的网关没有请求到，简单来说就是没有请求到可以执行的PHP-CGI。
+# 原因:而Nginx 504 Gateway Time-out则是一般于nginx.conf的设置有关。一般看来, 这种情况可能是由于nginx默认的fastcgi进程响应的缓冲区太小造成的, 这将导致fastcgi进程被挂起, 如果你的fastcgi服务对这个挂起处理的不好, 那么最后就极有可能导致504 Gateway Time-out
+{{{
+  2. 504错误一般是与nginx.conf配置有关了。主要与以下几个参数有关：fastcgi_connect_timeout、fastcgi_send_timeout、fastcgi_read_timeout、fastcgi_buffer_size、fastcgi_buffers、fastcgi_busy_buffers_size、fastcgi_temp_file_write_size、fastcgi_intercept_errors。特别是前三个超时时间。如果fastcgi缓冲区太小会导致fastcgi进程被挂起从而演变为504错误。
+  1.现在的网站, 尤其某些论坛有大量的回复和很多内容的, 一个页面甚至有几百K
+	  默认的fastcgi进程响应的缓冲区是8K, 我们可以设置大点
+
+	  在nginx.conf里, 加入:
+
+	  fastcgi_buffers 8 128k
+
+	  这表示设置fastcgi缓冲区为8×128k
+	  当然如果您在进行某一项即时的操作, 可能需要nginx的超时参数调大点, 例如设置成60秒:
+
+	  send_timeout 60;
+
+  我只是调整了这两个参数, 结果就是没有再显示那个超时, 可以说效果不错
+
+	  另一篇文章
+
+	  首先是更改php-fpm的几处配置：
+
+	  把max_children由之前的10改为现在的30，这样就可以保证 有充足的php-cgi进程可以被使用；
+
+	  把request_terminate_timeout由之前的0s改为60s，这样php-cgi进程 处理脚本的超时时间就是60秒，可以防止进程都被挂起，提高利用效率。
+
+	  接着再更改nginx的几个配置项，减少FastCGI的请求次 数，尽量维持buffers不变：
+
+	    fastcgi_buffers由 4 64k 改为 2 256k；
+		  fastcgi_buffer_size 由 64k 改为 128K；
+		    fastcgi_busy_buffers_size 由 128K 改为 256K；
+			  fastcgi_temp_file_write_size 由 128K 改为 256K。
+
+			  好了，重新加载php-fpm和nginx的配置，再次测试，至今两周时间内没有再出现504 Gateway Time-out的情况，算是达到效果了。
+
+			  另外，php-fpm的默认静态处理方式会使得php-cgi的进程长期占用内存而无法释放，这也是导致nginx出错的原因之一，因此可以将php-fpm的处理方式改成apache模式。
+			  apache-like
+	3.原以为这样就可以高枕无忧了，迁移完成是也确实没什么问题，但是如果你不去分析问题的根本原因在哪。问题还是会找上门来，第二天nginx又报了504的gateway timeout。这回没apache什么事了吧，apache总算撇清了关系。
+	那应该还是在nginx和php-fpm身上，查看nginx的错误日志，可以看到
+	[error] 6695#0: *168438 upstream timed out (110: Connection timed out) while reading response header from upstream,
+
+	  ...
+		  request: "GET /kd/open.php?company=chinapost&number=PA24977020344 HTTP/1.1", upstream: "fastcgi://127.0.0.1:9000", host: "www.jbxue.com"
+
+		  看到这里基本上就排除了nginx嫌疑，nginx是在等待php处理"GET /kd/open.php?company=chinapost&number=PA24977020344 HTTP/1.1"超时退出了。
+		  马上重启php-fpm，问题没有了，网站可以访问了。
+		  再次访问该页面，依然没有响应，但同时访问别的页面正常，该页面刷新几次后，整个网站都是bad gateway timeout了。
+		  问题就缩小到这个php脚本上了。
+		  netstat -napo |grep "php5-fpm" | wc -l
+
+		  查看php工作进程已经达到了配置文件里的上限10，有种感觉就是大家都被open.php这个脚本卡住了。
+		  这个脚本是干什么的呢？这个脚本就是采集快递信息的，里面用到了php_curl。
+		  PHP脚本如果执行时间超过php.ini中的配置项max_execution_time不出结果就会强制退出。
+		  查看了php.ini中max_execution_time确实配了，值为30。
+		  万能google派上用场了，经过不断google后得到下面这句话
+		  set_time_limit()函数和配置指令max_execution_time只影响脚本本身执行的时间。任何发生在诸如使用system()的系统调用，流操作，数据库操作等的脚本执行的最大时间不包括其中，当该脚本已运行。www.jbxue.com
+		  就是说如果脚本中执行了其它操作的时间是不计在脚本运行时间当中的，如果你没设置超时，那么php就会一直等待调用的结果。
+		  查看open.php源文件一看，果然没有设置curl的超时时间。
+		  增加如下两行,重新刷新，后问题解决了。
+		  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); //timeout on connect
+
+  curl_setopt($ch, CURLOPT_TIMEOUT, 10); //timeout on response
+  当然，除了这种方法外，php-fpm里也提供参数供我们强制杀死长时间无结果的进程，只是该参数默认没打开。
+	  php-fpm的配置文件里可以设置一个参数request_terminate_timeout，请求终止的超时时间，当请求执行超过这个时间就会被kill。
+	  同时它还有个参数request_slowlog_timeout，用来记录慢请求日志的。
+	  命令行运行php的话，可以使用这段代码
+	  复制代码
+
+	  $real_execution_time_limit = 60; //时间限制
+
+  if (pcntl_fork())
+  {
+	  // some long time code which should be
+	  // terminated after $real_execution_time_limit seconds passed if it's not
+	  // finished by that time
+  }
+  else
+  {
+	  sleep($real_execution_time_limit);
+	  posix_kill(posix_getppid(), SIGKILL);
+  }
+
+  复制代码
+	  分类: PHP实例教程
+  }}} 

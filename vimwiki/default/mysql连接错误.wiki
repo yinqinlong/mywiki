@@ -1,0 +1,8 @@
+===mysql连接错误===
+# Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock'的解决
+{{{
+错误原因:/var/run/mysqld/mysqld.sock文件不存在或者权限不对
+解决方案:sudo chown -R mysql:mysql /var/run/mysqld,查看权限
+2.删除所有的mysql有关的进程，重启。
+3.可能磁盘空间不够了，清理磁盘
+}}}
